@@ -412,16 +412,54 @@ async function getRoutes() {
 // ================================================================
 //  MAP DRAWING
 // ================================================================
+// Per-route distinct colors so all routes are visually different on the map
+const ROUTE_COLORS = [
+  { line: '#2979ff', glow: '#2979ff' },  // Route A – blue
+  { line: '#ff9100', glow: '#ff9100' },  // Route B – orange
+  { line: '#d500f9', glow: '#d500f9' },  // Route C – purple
+];
+
 function routeColor(score) {
   return wsmMode ? (score>=60?'#ff4081':'#ff6d00') : (score>=60?'#00c853':'#ff1744');
 }
 
-function drawRoute(route, index) {
-  const color = routeColor(route.safety_score);
-  const glow = L.polyline(route.coords, { color, weight: 14, opacity: 0.12, lineJoin:'round' }).addTo(map);
-  const line = L.polyline(route.coords, { color, weight: 5, opacity: 0.92, lineJoin:'round', lineCap:'round' }).addTo(map);
-  line.bindPopup(`<b>${route.name}</b><br>🛡 Safety: <b>${route.safety_score}/100</b><br>⏱ ${route.eta} • 📏 ${route.distance}`);
-  routeLines.push(glow, line);
+function drawRoute(route, index, dimmed) {
+  const palette = ROUTE_COLORS[index % ROUTE_COLORS.length];
+  const opacity = dimmed ? 0.22 : 0.92;
+  const glowOp  = dimmed ? 0.04 : 0.15;
+  const weight  = dimmed ? 4    : 6;
+
+  const glow = L.polyline(route.coords, {
+    color: palette.glow, weight: 18, opacity: glowOp, lineJoin: 'round'
+  }).addTo(map);
+
+  const line = L.polyline(route.coords, {
+    color: palette.line, weight, opacity, lineJoin: 'round', lineCap: 'round'
+  }).addTo(map);
+
+  line.bindPopup(
+    `<b>${route.name}</b><br>🛡 Safety: <b>${route.safety_score}/100</b><br>⏱ ${route.eta} • 📏 ${route.distance}`
+  );
+
+  // Midpoint label marker so routes are labeled on the map
+  const mid = route.coords[Math.floor(route.coords.length / 2)];
+  const labelIcon = L.divIcon({
+    className: '',
+    html: `<div style="
+      background:${palette.line};
+      color:#fff;
+      font-size:11px;
+      font-weight:700;
+      padding:3px 8px;
+      border-radius:12px;
+      box-shadow:0 2px 6px rgba(0,0,0,.35);
+      white-space:nowrap;
+      opacity:${dimmed ? 0.35 : 1};
+      ">${route.name}</div>`,
+    iconAnchor: [30, 12]
+  });
+  const labelMkr = L.marker(mid, { icon: labelIcon, interactive: false }).addTo(map);
+  routeLines.push(glow, line, labelMkr);
 }
 
 function clearRoutes() {
@@ -482,12 +520,12 @@ function renderRouteCards() {
     card.id = `card-${i}`;
     card.onclick = () => selectRoute(i, card);
 
-    const dotClass = isSafe ? 'green' : isMid ? 'orange' : 'red';
+    const mapColor = (ROUTE_COLORS[i % ROUTE_COLORS.length] || ROUTE_COLORS[0]).line;
     const badgeClass = isSafe ? 'badge-safe' : isMid ? 'badge-mid' : 'badge-risk';
     const labelHtml = route.label ? `<span class="route-label">${route.label}</span>` : '';
 
     card.innerHTML = `
-      <div class="route-dot ${dotClass}"></div>
+      <div style="width:5px;min-width:5px;height:52px;border-radius:4px;background:${mapColor};margin-right:10px;flex-shrink:0;"></div>
       <div class="route-card-info">
         <div class="route-card-name">${route.name} ${labelHtml}</div>
         <div class="route-card-meta">⏱ ${route.eta} &nbsp;•&nbsp; 📏 ${route.distance}</div>
@@ -502,8 +540,11 @@ function selectRoute(index, cardEl) {
   document.querySelectorAll('.route-card').forEach(c => c.classList.remove('selected'));
   cardEl.classList.add('selected');
   selectedRoute = index;
+
+  // Redraw: highlight selected route, dim others
   clearRoutes();
-  routesData.forEach((r,i) => drawRoute(r,i));
+  routesData.forEach((r, i) => drawRoute(r, i, i !== index));
+
   setTimeout(() => {
     showScreen('safety-card');
     populateSafetyCard(routesData[index]);
@@ -591,7 +632,7 @@ function startNavigation() {
 
   // Highlight selected route only
   clearRoutes();
-  drawRoute(route, 0);
+  drawRoute(route, selectedRoute ?? 0);
 
   // Create animated car marker
   if (navMarker) map.removeLayer(navMarker);
@@ -667,9 +708,9 @@ function stopNavigation() {
   document.getElementById('top-bar').classList.remove('hidden');
   hideAlert();
 
-  // Redraw all routes
-  routesData.forEach((r,i) => drawRoute(r,i));
-  if (routesData.length) map.fitBounds(routesData.flatMap(r=>r.coords), { padding:[80,90] });
+  // Redraw all routes (no dimming after nav ends)
+  routesData.forEach((r, i) => drawRoute(r, i, false));
+  if (routesData.length) map.fitBounds(routesData.flatMap(r => r.coords), { padding: [80, 90] });
 }
 
 // ================================================================
@@ -727,5 +768,5 @@ function toggleWomenSafetyMode(active) {
   document.querySelector('.bottom-panel').classList.toggle('wsm-mode', active);
   if (active) showAlert('🛡 Women Safety Mode ON – Routes re-optimized for your safety');
   else hideAlert();
-  if (routeLines.length && routesData.length) { clearRoutes(); routesData.forEach((r,i)=>drawRoute(r,i)); }
+  if (routeLines.length && routesData.length) { clearRoutes(); routesData.forEach((r, i) => drawRoute(r, i, false)); }
 }
