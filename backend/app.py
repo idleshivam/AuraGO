@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from data import get_routes
-from safety import calculate_route_safety, detect_risks
+from backend.data import get_routes
+from backend.safety import calculate_route_safety, detect_risks
 import os
 
 app = Flask(__name__)
