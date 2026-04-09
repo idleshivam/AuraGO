@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from safety import calculate_safety
 from data import get_routes
+from safety import calculate_route_safety, detect_risks
 
 app = Flask(__name__)
 CORS(app)
@@ -18,15 +18,11 @@ def routes():
 
     routes = get_routes(source, destination)
 
-    # Add safety score
     for route in routes:
-        route["safety_score"] = calculate_safety(
-            route["crowd"],
-            route["lighting"],
-            route["activity"]
-        )
+        route["safety_score"] = calculate_route_safety(route["segments"])
+        route["risks"] = detect_risks(route["segments"])
 
-    # Sort by safety
+    # Sort by safest
     routes = sorted(routes, key=lambda x: x["safety_score"], reverse=True)
 
     return jsonify(routes)
