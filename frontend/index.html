@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SafeRoute AI – Smart Navigation</title>
+  <meta name="description" content="SafeRoute AI uses real-time safety data to find the safest routes for women and vulnerable travelers." />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== LIVE ALERT BANNER ===== -->
+  <div id="alert-banner" class="alert-banner hidden">
+    <span class="alert-icon">⚠️</span>
+    <span id="alert-text">Entering low safety zone</span>
+    <button class="alert-close" onclick="dismissAlert()">✕</button>
+  </div>
+
+  <!-- ===== NAVIGATION: TURN DIRECTION BANNER (top) ===== -->
+  <div id="nav-turn-banner" class="nav-turn-banner hidden">
+    <div class="nav-turn-icon" id="nav-turn-icon">⬆️</div>
+    <div class="nav-turn-info">
+      <div class="nav-turn-dist" id="nav-turn-dist">In 200 m</div>
+      <div class="nav-turn-street" id="nav-turn-street">Continue straight</div>
+    </div>
+    <button class="nav-stop-btn" onclick="stopNavigation()">✕ End</button>
+  </div>
+
+  <!-- ===== TOP BAR ===== -->
+  <div class="top-bar" id="top-bar">
+    <!-- Dynamic back button (hidden by default) -->
+    <button class="top-back-btn hidden" id="top-back-btn" onclick="handleBack()">
+      <span>←</span>
+    </button>
+    <div class="top-bar-left" id="top-bar-brand">
+      <div class="app-logo">🛡️</div>
+      <div>
+        <div class="app-name">SafeRoute AI</div>
+        <div class="app-subtitle">Women Safety Navigator</div>
+      </div>
+    </div>
+    <div class="top-bar-right">
+      <div class="status-dot pulse"></div>
+      <span class="status-label">Live</span>
+    </div>
+  </div>
+
+  <!-- ===== FULL SCREEN MAP ===== -->
+  <div id="map"></div>
+
+  <!-- ===== EMERGENCY SOS BUTTON (floating) ===== -->
+  <a href="tel:100" class="sos-float-btn" id="sos-btn">
+    <span class="sos-icon">🚨</span>
+    <span class="sos-text">SOS</span>
+  </a>
+
+  <!-- ===== WOMEN SAFETY MODE TOGGLE (floating) ===== -->
+  <div class="wsm-toggle-float" id="wsm-float">
+    <div class="wsm-label-row">
+      <span class="wsm-icon">👩</span>
+      <span class="wsm-text">Women Safety Mode</span>
+    </div>
+    <label class="toggle-switch">
+      <input type="checkbox" id="wsm-toggle" onchange="toggleWomenSafetyMode(this.checked)" />
+      <span class="toggle-slider"></span>
+    </label>
+  </div>
+
+  <!-- ===== BOTTOM PANEL (Uber-style) ===== -->
+  <div class="bottom-panel" id="bottom-panel">
+    <div class="panel-handle" onclick="togglePanel()">
+      <div class="handle-bar"></div>
+    </div>
+
+    <!-- ── SCREEN 1: Search ── -->
+    <div class="panel-screen" id="search-section">
+      <div class="section-title">Where do you want to go?</div>
+
+      <div class="autocomplete-wrapper">
+        <div class="input-group">
+          <div class="input-icon">📍</div>
+          <input id="source" type="text" placeholder="Your location"
+            autocomplete="off"
+            oninput="onInputChange('source')"
+            onkeydown="onInputKeydown(event,'source')"
+            onfocus="onInputFocus('source')" />
+          <button class="clear-btn" id="clear-source" onclick="clearInput('source')" style="display:none">✕</button>
+        </div>
+        <div class="suggestions-list hidden" id="suggestions-source"></div>
+      </div>
+
+      <div class="autocomplete-wrapper">
+        <div class="input-group">
+          <div class="input-icon">🎯</div>
+          <input id="destination" type="text" placeholder="Enter destination"
+            autocomplete="off"
+            oninput="onInputChange('destination')"
+            onkeydown="onInputKeydown(event,'destination')"
+            onfocus="onInputFocus('destination')" />
+          <button class="clear-btn" id="clear-destination" onclick="clearInput('destination')" style="display:none">✕</button>
+        </div>
+        <div class="suggestions-list hidden" id="suggestions-destination"></div>
+      </div>
+
+      <button id="find-btn" onclick="getRoutes()">
+        <span id="btn-label">🔍 Find Safe Route</span>
+        <div id="btn-spinner" class="spinner hidden"></div>
+      </button>
+    </div>
+
+    <!-- ── SCREEN 2: Route Options ── -->
+    <div class="panel-screen hidden" id="route-options">
+      <div class="screen-header">
+        <button class="screen-back-btn" onclick="goToSearch()">← Back</button>
+        <div class="screen-header-title">Choose Route</div>
+        <div class="screen-header-sub" id="route-header-sub"></div>
+      </div>
+      <div id="route-cards-container"></div>
+    </div>
+
+    <!-- ── SCREEN 3: Safety Card ── -->
+    <div class="panel-screen hidden" id="safety-card">
+      <div class="screen-header">
+        <button class="screen-back-btn" onclick="goToRouteOptions()">← Back</button>
+        <div class="screen-header-title">Safety Analysis</div>
+      </div>
+
+      <div class="score-row">
+        <div class="score-ring-wrapper">
+          <svg class="score-ring" viewBox="0 0 120 120">
+            <circle class="ring-bg" cx="60" cy="60" r="50"/>
+            <circle class="ring-fill" id="score-ring-fill" cx="60" cy="60" r="50"
+              stroke-dasharray="314" stroke-dashoffset="314"/>
+          </svg>
+          <div class="score-center">
+            <span class="score-num" id="score-num">--</span>
+            <span class="score-denom">/100</span>
+          </div>
+        </div>
+        <div class="score-info">
+          <div class="score-label">Safety Score</div>
+          <div class="score-desc" id="score-desc">Analyzing…</div>
+          <div class="route-eta" id="route-eta">⏱ -- • 📏 --</div>
+        </div>
+      </div>
+
+      <div class="risks-section">
+        <div class="risks-title">⚠ Identified Risks</div>
+        <div id="risks-list" class="risks-list"></div>
+      </div>
+      <div class="highlights-section" id="highlights-section"></div>
+
+      <button class="navigate-btn" id="navigate-btn" onclick="startNavigation()">
+        🧭 Start Navigation
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== NAVIGATION HUD (bottom, shown during navigation) ===== -->
+  <div id="nav-hud" class="nav-hud hidden">
+    <div class="nav-hud-top">
+      <div class="nav-hud-eta">
+        <div class="nav-hud-val" id="nav-hud-eta-val">--</div>
+        <div class="nav-hud-key">Arrival</div>
+      </div>
+      <div class="nav-hud-divider"></div>
+      <div class="nav-hud-dist">
+        <div class="nav-hud-val" id="nav-hud-dist-val">--</div>
+        <div class="nav-hud-key">Distance</div>
+      </div>
+      <div class="nav-hud-divider"></div>
+      <div class="nav-hud-safety">
+        <div class="nav-hud-val" id="nav-hud-safety-val">--</div>
+        <div class="nav-hud-key">Safety</div>
+      </div>
+    </div>
+    <button class="nav-end-btn" onclick="stopNavigation()">
+      ■ End Navigation
+    </button>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
