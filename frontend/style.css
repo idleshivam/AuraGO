@@ -511,3 +511,107 @@ html, body { width: 100%; height: 100%; overflow: hidden;
 }
 .safe-card .route-risks-mini  { color: #2e7d32; }
 .mid-card  .route-risks-mini  { color: #bf360c; }
+
+/* ================================================================
+   SEGMENT COLOR STRIP  (Feature 3 – per-segment safety bar)
+   ================================================================ */
+.seg-strip {
+  display: flex; gap: 3px; margin: 5px 0 2px;
+  height: 5px; border-radius: 3px; overflow: hidden;
+}
+.seg-strip-cell {
+  flex: 1; border-radius: 2px;
+  transition: opacity 0.2s;
+}
+.seg-strip-cell:hover { opacity: 0.75; }
+
+/* Veto badge shown on route card when women mode vetoes a route */
+.wsm-veto-badge {
+  font-size: 9px; font-weight: 800;
+  background: rgba(255,23,68,0.12); color: #b71c1c;
+  border: 1px solid rgba(255,23,68,0.3);
+  border-radius: 4px; padding: 1px 5px;
+  margin-left: 5px; vertical-align: middle;
+  animation: pulse-badge 1.4s infinite;
+}
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+/* Women-mode explanation feel chip under route card */
+.route-explanation {
+  font-size: 10px; font-weight: 600;
+  color: #ad1457;
+  background: rgba(255,64,129,0.08);
+  border-radius: 4px; padding: 2px 6px;
+  margin-top: 3px; display: inline-block;
+}
+
+/* ================================================================
+   SOS ARRIVAL TIMER MODAL  (Feature 4)
+   ================================================================ */
+.sos-timer-modal {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  z-index: 1500;
+  background: rgba(26,26,46,0.97); backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,64,129,0.35);
+  border-radius: 20px; padding: 18px 22px 16px;
+  min-width: 240px; max-width: 310px; width: 90%;
+  box-shadow: 0 8px 40px rgba(255,23,68,0.35);
+  text-align: center;
+  animation: slide-up-modal 0.45s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes slide-up-modal {
+  from { opacity: 0; transform: translateX(-50%) translateY(30px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.sos-timer-modal.hidden { display: none !important; }
+
+.sos-timer-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px; justify-content: center;
+  position: relative;
+}
+.sos-timer-shield { font-size: 18px; }
+.sos-timer-title  {
+  font-size: 13px; font-weight: 700; color: #fff;
+  letter-spacing: 0.02em;
+}
+.sos-timer-close {
+  position: absolute; right: 0; top: -4px;
+  background: rgba(255,255,255,0.1); border: none;
+  color: rgba(255,255,255,0.6); width: 24px; height: 24px;
+  border-radius: 50%; font-size: 11px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.sos-timer-close:hover { background: rgba(255,255,255,0.2); }
+
+.sos-timer-display {
+  font-size: 42px; font-weight: 800; color: #fff;
+  letter-spacing: 2px; font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+  transition: color 0.4s;
+}
+@keyframes pulse-sos-text {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.sos-timer-label {
+  font-size: 11px; color: rgba(255,255,255,0.55);
+  margin-bottom: 14px; font-weight: 500;
+}
+
+.sos-timer-safe-btn {
+  width: 100%; padding: 11px; border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #00c853, #00897b);
+  color: #fff; font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: 'Inter', sans-serif;
+  box-shadow: 0 4px 14px rgba(0,200,83,0.4);
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+.sos-timer-safe-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,200,83,0.5); }
+.sos-timer-safe-btn:active { transform: translateY(0); }

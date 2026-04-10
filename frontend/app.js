@@ -20,6 +20,10 @@ let userLocation  = null;   // { lat, lon } from geolocation
 let navInterval   = null;   // animation interval for navigation
 let navMarker     = null;   // Leaflet marker for navigation car
 
+// SOS Timer state
+let sosTimerInterval  = null;
+let sosTimerSeconds   = 0;
+
 // ──────────── Get User Location (for nearby suggestions) ────────────
 (function detectUserLocation() {
   if (!navigator.geolocation) return;
@@ -367,7 +371,7 @@ async function getRoutes() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(4000),
-      body: JSON.stringify({ source: srcVal, destination: dstVal })
+      body: JSON.stringify({ source: srcVal, destination: dstVal, women_mode: wsmMode })
     });
     if (res.ok) safetyData = await res.json();
   } catch (e) { /* use mock */ }
@@ -383,13 +387,15 @@ async function getRoutes() {
     const fb      = FALLBACK_PROFILES[i] || FALLBACK_PROFILES[1];
     const score   = Math.min(100, Math.max(0, Math.round(b?.safety_score ?? fb.score)));
     return {
-      name:         b?.name || `Route ${String.fromCharCode(65+i)}`,
-      distance:     r.distance,
-      eta:          r.eta,
-      durationMins: r.durationMins,
-      safety_score: score,
-      risks:        b?.risks?.length ? b.risks : fb.risks,
-      coords:       r.coords
+      name:            b?.name || `Route ${String.fromCharCode(65+i)}`,
+      distance:        r.distance,
+      eta:             r.eta,
+      durationMins:    r.durationMins,
+      safety_score:    score,
+      risks:           b?.risks?.length ? b.risks : fb.risks,
+      segment_labels:  b?.segment_labels || [],
+      explanation:     b?.explanation   || null,
+      coords:          r.coords
     };
   });
   routesData.sort((a,b) => b.safety_score - a.safety_score);
@@ -520,16 +526,30 @@ function renderRouteCards() {
     card.id = `card-${i}`;
     card.onclick = () => selectRoute(i, card);
 
-    const mapColor = (ROUTE_COLORS[i % ROUTE_COLORS.length] || ROUTE_COLORS[0]).line;
+    const mapColor  = (ROUTE_COLORS[i % ROUTE_COLORS.length] || ROUTE_COLORS[0]).line;
     const badgeClass = isSafe ? 'badge-safe' : isMid ? 'badge-mid' : 'badge-risk';
-    const labelHtml = route.label ? `<span class="route-label">${route.label}</span>` : '';
+    const labelHtml  = route.label ? `<span class="route-label">${route.label}</span>` : '';
+
+    // ── Vetoed route badge (women mode only) ──
+    const vetoBadge = (wsmMode && route.safety_score <= 30)
+      ? `<span class="wsm-veto-badge">🚫 Avoid</span>` : '';
+
+    // ── Per-segment color strip ──
+    const segStrip = buildSegmentStrip(route.segment_labels);
+
+    // ── Explanation snippet ──
+    const expHtml = (wsmMode && route.explanation)
+      ? `<div class="route-explanation">${route.explanation.feels_like ? '🧭 ' + route.explanation.feels_like : ''}</div>`
+      : '';
 
     card.innerHTML = `
       <div style="width:5px;min-width:5px;height:52px;border-radius:4px;background:${mapColor};margin-right:10px;flex-shrink:0;"></div>
       <div class="route-card-info">
-        <div class="route-card-name">${route.name} ${labelHtml}</div>
+        <div class="route-card-name">${route.name} ${labelHtml} ${vetoBadge}</div>
         <div class="route-card-meta">⏱ ${route.eta} &nbsp;•&nbsp; 📏 ${route.distance}</div>
+        ${segStrip}
         <div class="route-risks-mini">${route.risks.slice(0,1).map(r=>`⚠ ${r}`).join(' ')}</div>
+        ${expHtml}
       </div>
       <div class="route-card-badge ${badgeClass}">${route.safety_score}<span style="font-size:9px">/100</span></div>`;
     container.appendChild(card);
@@ -549,6 +569,8 @@ function selectRoute(index, cardEl) {
     showScreen('safety-card');
     populateSafetyCard(routesData[index]);
     if (routesData[index].safety_score < 60) showAlert(`⚠ Entering low safety zone – ${routesData[index].name}`);
+    // Auto-start SOS timer when Women Safety Mode is active
+    if (wsmMode) startSOSTimer(routesData[index].durationMins);
   }, 250);
 }
 
@@ -767,6 +789,75 @@ function toggleWomenSafetyMode(active) {
   document.getElementById('wsm-float').classList.toggle('wsm-active', active);
   document.querySelector('.bottom-panel').classList.toggle('wsm-mode', active);
   if (active) showAlert('🛡 Women Safety Mode ON – Routes re-optimized for your safety');
-  else hideAlert();
+  else { hideAlert(); cancelSOSTimer(); }
   if (routeLines.length && routesData.length) { clearRoutes(); routesData.forEach((r, i) => drawRoute(r, i, false)); }
+}
+
+// ================================================================
+//  SEGMENT COLOR STRIP
+// ================================================================
+function buildSegmentStrip(labels) {
+  if (!labels || !labels.length) return '';
+  const colorMap = { safe: '#00c853', moderate: '#ffd600', danger: '#ff1744' };
+  const segments = labels.map(l => {
+    const c = colorMap[l] || '#ccc';
+    return `<div class="seg-strip-cell" style="background:${c};" title="${l}"></div>`;
+  }).join('');
+  return `<div class="seg-strip">${segments}</div>`;
+}
+
+// ================================================================
+//  SOS ARRIVAL TIMER
+// ================================================================
+function startSOSTimer(etaMins) {
+  cancelSOSTimer();
+  // Grace window = ETA + 5 minutes (in seconds)
+  sosTimerSeconds = (etaMins + 5) * 60;
+
+  const modal   = document.getElementById('sos-timer-modal');
+  const display = document.getElementById('sos-timer-display');
+  const label   = document.getElementById('sos-timer-label');
+  modal.classList.remove('hidden');
+  label.textContent = `Auto-alert in ${etaMins + 5} min if not cancelled`;
+
+  sosTimerInterval = setInterval(() => {
+    sosTimerSeconds--;
+    const m = Math.floor(sosTimerSeconds / 60);
+    const s = sosTimerSeconds % 60;
+    display.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+    if (sosTimerSeconds <= 60) {
+      display.style.color = '#ff1744';
+      display.style.animation = 'pulse-sos-text 0.6s infinite';
+    }
+
+    if (sosTimerSeconds <= 0) {
+      clearInterval(sosTimerInterval);
+      modal.classList.add('hidden');
+      triggerSOSAlert();
+    }
+  }, 1000);
+}
+
+function cancelSOSTimer() {
+  if (sosTimerInterval) { clearInterval(sosTimerInterval); sosTimerInterval = null; }
+  const modal = document.getElementById('sos-timer-modal');
+  if (modal) modal.classList.add('hidden');
+  const display = document.getElementById('sos-timer-display');
+  if (display) { display.style.color = ''; display.style.animation = ''; }
+}
+
+function triggerSOSAlert() {
+  // Build a shareable location URL
+  const locStr = userLocation
+    ? `https://maps.google.com/?q=${userLocation.lat},${userLocation.lon}`
+    : 'Location unavailable';
+  const msg = `🚨 SOS! I haven't reached my destination. Last known location: ${locStr}`;
+  // Try Web Share API (works on mobile), fallback to copy
+  if (navigator.share) {
+    navigator.share({ title: 'Emergency SOS', text: msg }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(msg).catch(() => {});
+    showAlert('🚨 SOS message copied to clipboard! Share with emergency contact.');
+  }
 }

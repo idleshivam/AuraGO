@@ -181,6 +181,18 @@
     </button>
   </div>
 
+  <!-- ===== SOS ARRIVAL TIMER MODAL (Women Safety Mode) ===== -->
+  <div id="sos-timer-modal" class="sos-timer-modal hidden">
+    <div class="sos-timer-header">
+      <span class="sos-timer-shield">🛡️</span>
+      <span class="sos-timer-title">Safe Arrival Timer</span>
+      <button class="sos-timer-close" onclick="cancelSOSTimer()" title="I'm safe – cancel timer">✕</button>
+    </div>
+    <div id="sos-timer-display" class="sos-timer-display">--:--</div>
+    <div id="sos-timer-label" class="sos-timer-label">Auto-alert if not cancelled</div>
+    <button class="sos-timer-safe-btn" onclick="cancelSOSTimer()">✅ I'm Safe – Cancel Alert</button>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
 </body>
