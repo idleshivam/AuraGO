@@ -50,11 +50,31 @@
   <!-- ===== FULL SCREEN MAP ===== -->
   <div id="map"></div>
 
-  <!-- ===== EMERGENCY SOS BUTTON (floating) ===== -->
-  <a href="tel:100" class="sos-float-btn" id="sos-btn">
-    <span class="sos-icon">🚨</span>
-    <span class="sos-text">SOS</span>
-  </a>
+  <!-- ===== EMERGENCY HUB (fan-out: Police / Ambulance / Fire) ===== -->
+  <div class="emergency-hub" id="sos-btn">
+
+    <!-- Fan-out service buttons (hidden until hub is open) -->
+    <div class="emg-services" id="emg-services">
+      <a href="tel:101" class="emg-service-btn fire" title="Fire Brigade – 101">
+        <span class="emg-svc-icon">🚒</span>
+        <span class="emg-svc-label">101</span>
+      </a>
+      <a href="tel:108" class="emg-service-btn ambulance" title="Ambulance – 108">
+        <span class="emg-svc-icon">🚑</span>
+        <span class="emg-svc-label">108</span>
+      </a>
+      <a href="tel:100" class="emg-service-btn police" title="Police – 100">
+        <span class="emg-svc-icon">🚔</span>
+        <span class="emg-svc-label">100</span>
+      </a>
+    </div>
+
+    <!-- Main trigger button -->
+    <button class="emg-main-btn" id="emg-main-btn" onclick="toggleEmergencyHub()" aria-label="Emergency services">
+      <span class="emg-main-icon" id="emg-main-icon">🚨</span>
+      <span class="emg-main-label">SOS</span>
+    </button>
+  </div>
 
   <!-- ===== WOMEN SAFETY MODE TOGGLE (floating) ===== -->
   <div class="wsm-toggle-float" id="wsm-float">

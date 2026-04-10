@@ -772,6 +772,25 @@ window.addEventListener('resize', updateWSMFloat);
 window.addEventListener('load',   updateWSMFloat);
 
 // ================================================================
+//  EMERGENCY HUB  (fan-out toggle)
+// ================================================================
+let emergencyHubOpen = false;
+
+function toggleEmergencyHub() {
+  emergencyHubOpen = !emergencyHubOpen;
+  document.getElementById('sos-btn').classList.toggle('open', emergencyHubOpen);
+}
+
+// Close hub when user taps anywhere outside it
+document.addEventListener('click', e => {
+  const hub = document.getElementById('sos-btn');
+  if (emergencyHubOpen && hub && !hub.contains(e.target)) {
+    emergencyHubOpen = false;
+    hub.classList.remove('open');
+  }
+});
+
+// ================================================================
 //  ALERT BANNER
 // ================================================================
 function showAlert(msg) {
