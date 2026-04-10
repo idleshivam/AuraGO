@@ -615,3 +615,68 @@ html, body { width: 100%; height: 100%; overflow: hidden;
 }
 .sos-timer-safe-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,200,83,0.5); }
 .sos-timer-safe-btn:active { transform: translateY(0); }
+
+/* ================================================================
+   SOS CONFIRMATION MODAL  (Step 2 – "Are you safe?")
+   ================================================================ */
+.sos-confirm-modal {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  z-index: 1600;   /* above the timer modal */
+  background: rgba(26,14,0,0.97); backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(255,160,0,0.5);
+  border-radius: 20px; padding: 22px 22px 18px;
+  min-width: 240px; max-width: 320px; width: 90%;
+  box-shadow: 0 8px 48px rgba(255,120,0,0.45);
+  text-align: center;
+  animation: slide-up-modal 0.35s cubic-bezier(.34,1.56,.64,1);
+}
+.sos-confirm-modal.hidden { display: none !important; }
+
+.sos-confirm-icon {
+  font-size: 36px; margin-bottom: 8px;
+  animation: shake-icon 0.5s ease infinite alternate;
+}
+@keyframes shake-icon {
+  from { transform: rotate(-6deg) scale(1);   }
+  to   { transform: rotate( 6deg) scale(1.1); }
+}
+
+.sos-confirm-title {
+  font-size: 20px; font-weight: 800; color: #fff;
+  margin-bottom: 6px; letter-spacing: -0.3px;
+}
+
+.sos-confirm-body {
+  font-size: 13px; color: rgba(255,255,255,0.65);
+  line-height: 1.5; margin-bottom: 4px;
+}
+
+.sos-confirm-countdown {
+  font-size: 52px; font-weight: 900; color: #ffa000;
+  letter-spacing: 1px; font-variant-numeric: tabular-nums;
+  margin: 6px 0 6px;
+  transition: color 0.3s;
+}
+
+.sos-confirm-safe-btn {
+  width: 100%; padding: 13px; border: none;
+  border-radius: 12px; margin-top: 14px;
+  background: linear-gradient(135deg, #00c853, #00897b);
+  color: #fff; font-size: 15px; font-weight: 800;
+  cursor: pointer; font-family: 'Inter', sans-serif;
+  box-shadow: 0 4px 16px rgba(0,200,83,0.45);
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+.sos-confirm-safe-btn:hover  { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,200,83,0.55); }
+.sos-confirm-safe-btn:active { transform: translateY(0); }
+
+.sos-confirm-sos-btn {
+  width: 100%; padding: 11px; border: none;
+  border-radius: 12px; margin-top: 8px;
+  background: rgba(255,23,68,0.15);
+  border: 1.5px solid rgba(255,23,68,0.4);
+  color: #ff6b6b; font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: 'Inter', sans-serif;
+  transition: background 0.2s;
+}
+.sos-confirm-sos-btn:hover { background: rgba(255,23,68,0.28); }

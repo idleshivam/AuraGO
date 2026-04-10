@@ -21,8 +21,9 @@ let navInterval   = null;   // animation interval for navigation
 let navMarker     = null;   // Leaflet marker for navigation car
 
 // SOS Timer state
-let sosTimerInterval  = null;
-let sosTimerSeconds   = 0;
+let sosTimerInterval   = null;
+let sosTimerSeconds    = 0;
+let sosConfirmInterval = null;  // sub-timer for "are you safe?" confirmation step
 
 // ──────────── Get User Location (for nearby suggestions) ────────────
 (function detectUserLocation() {
@@ -818,7 +819,7 @@ function startSOSTimer(etaMins) {
   const display = document.getElementById('sos-timer-display');
   const label   = document.getElementById('sos-timer-label');
   modal.classList.remove('hidden');
-  label.textContent = `Auto-alert in ${etaMins + 5} min if not cancelled`;
+  label.textContent = `Auto-check in ${etaMins + 5} min if not cancelled`;
 
   sosTimerInterval = setInterval(() => {
     sosTimerSeconds--;
@@ -833,18 +834,50 @@ function startSOSTimer(etaMins) {
 
     if (sosTimerSeconds <= 0) {
       clearInterval(sosTimerInterval);
+      sosTimerInterval = null;
       modal.classList.add('hidden');
-      triggerSOSAlert();
+      // ── Step 2: show confirmation prompt instead of firing immediately ──
+      startSOSConfirmation();
     }
   }, 1000);
 }
 
+// Step 2 – "Are you safe?" confirmation with its own 30-second countdown.
+// SOS is only fired if the user ignores this prompt too.
+function startSOSConfirmation() {
+  let confirmSeconds = 30;
+  const modal   = document.getElementById('sos-confirm-modal');
+  const display = document.getElementById('sos-confirm-countdown');
+  modal.classList.remove('hidden');
+  display.textContent = confirmSeconds;
+
+  sosConfirmInterval = setInterval(() => {
+    confirmSeconds--;
+    display.textContent = confirmSeconds;
+    if (confirmSeconds <= 10) display.style.color = '#ff1744';
+    if (confirmSeconds <= 0) {
+      clearInterval(sosConfirmInterval);
+      sosConfirmInterval = null;
+      modal.classList.add('hidden');
+      triggerSOSAlert();  // user ignored both prompts → fire SOS
+    }
+  }, 1000);
+}
+
+// Called when user taps "I'm Safe" on either modal
 function cancelSOSTimer() {
-  if (sosTimerInterval) { clearInterval(sosTimerInterval); sosTimerInterval = null; }
+  if (sosTimerInterval)   { clearInterval(sosTimerInterval);   sosTimerInterval   = null; }
+  if (sosConfirmInterval) { clearInterval(sosConfirmInterval); sosConfirmInterval = null; }
+
   const modal = document.getElementById('sos-timer-modal');
   if (modal) modal.classList.add('hidden');
+  const confirmModal = document.getElementById('sos-confirm-modal');
+  if (confirmModal) confirmModal.classList.add('hidden');
+
   const display = document.getElementById('sos-timer-display');
   if (display) { display.style.color = ''; display.style.animation = ''; }
+  const cd = document.getElementById('sos-confirm-countdown');
+  if (cd) { cd.style.color = ''; }
 }
 
 function triggerSOSAlert() {

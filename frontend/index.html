@@ -189,8 +189,19 @@
       <button class="sos-timer-close" onclick="cancelSOSTimer()" title="I'm safe – cancel timer">✕</button>
     </div>
     <div id="sos-timer-display" class="sos-timer-display">--:--</div>
-    <div id="sos-timer-label" class="sos-timer-label">Auto-alert if not cancelled</div>
+    <div id="sos-timer-label" class="sos-timer-label">Auto-check if not cancelled</div>
     <button class="sos-timer-safe-btn" onclick="cancelSOSTimer()">✅ I'm Safe – Cancel Alert</button>
+  </div>
+
+  <!-- ===== SOS CONFIRMATION MODAL (Step 2 – "Are you safe?") ===== -->
+  <div id="sos-confirm-modal" class="sos-confirm-modal hidden">
+    <div class="sos-confirm-icon">🚨</div>
+    <div class="sos-confirm-title">Are you safe?</div>
+    <div class="sos-confirm-body">You haven't confirmed arrival.<br>Alert will be sent in</div>
+    <div id="sos-confirm-countdown" class="sos-confirm-countdown">30</div>
+    <div class="sos-confirm-body" style="font-size:11px;margin-top:4px;">seconds unless you confirm.</div>
+    <button class="sos-confirm-safe-btn" onclick="cancelSOSTimer()">✅ Yes, I'm Safe!</button>
+    <button class="sos-confirm-sos-btn" onclick="cancelSOSTimer(); triggerSOSAlert()">🚨 Send SOS Now</button>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
