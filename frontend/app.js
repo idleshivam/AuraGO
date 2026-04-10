@@ -570,8 +570,6 @@ function selectRoute(index, cardEl) {
     showScreen('safety-card');
     populateSafetyCard(routesData[index]);
     if (routesData[index].safety_score < 60) showAlert(`⚠ Entering low safety zone – ${routesData[index].name}`);
-    // Auto-start SOS timer when Women Safety Mode is active
-    if (wsmMode) startSOSTimer(routesData[index].durationMins);
   }, 250);
 }
 
@@ -703,6 +701,9 @@ function startNavigation() {
     console.warn("Tracking error: ", err);
     showAlert('⚠ Waiting for GPS location...');
   }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 5000 });
+
+  // Start SOS arrival timer when Women Safety Mode is active
+  if (wsmMode) startSOSTimer(route.durationMins);
 }
 
 function updateTurnBanner(step) {
@@ -732,6 +733,7 @@ function stopNavigation() {
   hideAlert();
 
   // Redraw all routes (no dimming after nav ends)
+  cancelSOSTimer();  // clear SOS timer when navigation stops
   routesData.forEach((r, i) => drawRoute(r, i, false));
   if (routesData.length) map.fitBounds(routesData.flatMap(r => r.coords), { padding: [80, 90] });
 }
