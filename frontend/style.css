@@ -225,8 +225,26 @@ html, body { width: 100%; height: 100%; overflow: hidden;
 
 
 /* ================================================================
+   LANDMARK MARKERS  (hospitals, police, pharmacies along route)
+   ================================================================ */
+.landmark-marker {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 2.5px solid #ccc;          /* overridden inline per type */
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.landmark-marker:hover {
+  transform: scale(1.18);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.32);
+}
+.landmark-icon { font-size: 16px; line-height: 1; }
+
+/* ================================================================
    WOMEN SAFETY MODE TOGGLE
    ================================================================ */
+
 .wsm-toggle-float {
   position: fixed; bottom: 310px; left: 50%; transform: translateX(-50%);
   z-index: 800; display: flex; align-items: center; gap: 12px;

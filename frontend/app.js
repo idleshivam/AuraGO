@@ -10,15 +10,16 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 L.control.zoom({ position: 'topright' }).addTo(map);
 
 // ──────────── State ────────────
-let routeLines    = [];
-let wsmMode       = false;
-let panelOpen     = true;
-let alertTimeout  = null;
-let selectedRoute = null;
-let routesData    = [];
-let userLocation  = null;   // { lat, lon } from geolocation
-let navInterval   = null;   // animation interval for navigation
-let navMarker     = null;   // Leaflet marker for navigation car
+let routeLines      = [];
+let landmarkMarkers = [];  // hospital / police / pharmacy markers
+let wsmMode         = false;
+let panelOpen       = true;
+let alertTimeout    = null;
+let selectedRoute   = null;
+let routesData      = [];
+let userLocation    = null;   // { lat, lon } from geolocation
+let navInterval     = null;   // animation interval for navigation
+let navMarker       = null;   // Leaflet marker for navigation car
 
 // SOS Timer state
 let sosTimerInterval   = null;
@@ -410,6 +411,9 @@ async function getRoutes() {
   routesData.forEach((r,i) => drawRoute(r,i));
   map.fitBounds(routesData.flatMap(r=>r.coords), { padding: [80,90] });
 
+  // Fetch & display landmarks along the route (always, regardless of mode)
+  fetchAndShowLandmarks(routesData);
+
   setLoading(false);
   document.getElementById('route-header-sub').textContent = `${srcVal.split(',')[0]} → ${dstVal.split(',')[0]}`;
   goToRouteOptions();
@@ -472,6 +476,97 @@ function drawRoute(route, index, dimmed) {
 function clearRoutes() {
   routeLines.forEach(l => map.removeLayer(l));
   routeLines = [];
+  clearLandmarks();
+}
+
+function clearLandmarks() {
+  landmarkMarkers.forEach(m => map.removeLayer(m));
+  landmarkMarkers = [];
+}
+
+// ================================================================
+//  LANDMARK LAYER  (Overpass API – hospitals, police, pharmacies)
+// ================================================================
+const LANDMARK_CONFIG = [
+  { amenity: 'hospital', icon: '⚕️', label: 'Hospital',        color: '#e53935', bg: '#ffebee' },
+  { amenity: 'clinic',   icon: '🏥', label: 'Clinic',          color: '#e53935', bg: '#ffebee' },
+  { amenity: 'pharmacy', icon: '💊', label: 'Pharmacy',        color: '#2e7d32', bg: '#e8f5e9' },
+  { amenity: 'police',   icon: '🚔', label: 'Police Station',  color: '#1565c0', bg: '#e3f2fd' },
+];
+
+async function fetchAndShowLandmarks(routes) {
+  // Build bounding box from all route coords combined
+  const allCoords = routes.flatMap(r => r.coords);  // [[lat,lon], ...]
+  if (!allCoords.length) return;
+
+  const lats = allCoords.map(c => c[0]);
+  const lons = allCoords.map(c => c[1]);
+  const south = Math.min(...lats);
+  const north = Math.max(...lats);
+  const west  = Math.min(...lons);
+  const east  = Math.max(...lons);
+
+  // Small padding so landmarks slightly off-route are included
+  const pad = 0.008;
+  const bbox = `${south-pad},${west-pad},${north+pad},${east+pad}`;
+
+  const amenityFilter = LANDMARK_CONFIG.map(c => `node["amenity"="${c.amenity}"](${bbox});`).join('');
+  const query = `[out:json][timeout:12];(${amenityFilter});out body;`;
+  const url   = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+  try {
+    const res  = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    const data = await res.json();
+    if (!data.elements?.length) return;
+
+    // Deduplicate by (lat,lon) and limit per type to avoid map clutter
+    const seen    = new Set();
+    const countBy = {};
+    const MAX_PER_TYPE = 6;
+
+    data.elements.forEach(el => {
+      const amenity = el.tags?.amenity;
+      if (!amenity) return;
+      const cfg = LANDMARK_CONFIG.find(c => c.amenity === amenity);
+      if (!cfg) return;
+
+      countBy[amenity] = (countBy[amenity] || 0);
+      if (countBy[amenity] >= MAX_PER_TYPE) return;
+      countBy[amenity]++;
+
+      const key = `${el.lat.toFixed(5)},${el.lon.toFixed(5)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+
+      const name = el.tags?.name || cfg.label;
+      placeLandmarkMarker(el.lat, el.lon, cfg, name);
+    });
+  } catch (e) {
+    // Silently fail – landmarks are supplementary, not critical
+  }
+}
+
+function placeLandmarkMarker(lat, lon, cfg, name) {
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="landmark-marker" style="border-color:${cfg.color};background:${cfg.bg};">
+             <span class="landmark-icon">${cfg.icon}</span>
+           </div>`,
+    iconSize:   [34, 34],
+    iconAnchor: [17, 17]
+  });
+
+  const marker = L.marker([lat, lon], { icon, zIndexOffset: 200 })
+    .addTo(map)
+    .bindPopup(
+      `<div style="font-family:'Inter',sans-serif;font-size:13px;">
+         <strong>${cfg.icon} ${name}</strong><br>
+         <span style="font-size:11px;color:#555;">${cfg.label}</span>
+       </div>`,
+      { maxWidth: 200 }
+    );
+
+  landmarkMarkers.push(marker);
 }
 
 // ================================================================
