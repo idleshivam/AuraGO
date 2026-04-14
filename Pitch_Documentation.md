@@ -19,7 +19,7 @@ If this application was fully funded and launched, it would aggregate real-world
 1. **Government APIs:** Integrating Police Crime databases (FIR locations, past harassment reports) mapped tightly to geographic polygons.
 2. **Crowdsourcing (Waze Model):** Allowing users to anonymously "pin" zones that are unlit, have loitering groups, or feel inherently unsafe in real-time.
 3. **OpenStreetMap Tags:** Scanning OSM metadata for specific infrastructure tags like `lit=no` (no streetlights) or `cctv=yes` programmatically.
-4. **Live Feed Analysis:** Using municipal CCTV feeds or satellite density data to track live foot traffic.
+4. **Live Feed Analysis:** Using municipal CCTV feeds or satelite density data to track live foot traffic.
 
 ---
 
