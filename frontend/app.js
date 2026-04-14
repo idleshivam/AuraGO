@@ -20,7 +20,8 @@ let routesData      = [];
 let userLocation    = null;   // { lat, lon } from geolocation
 let navInterval     = null;   // animation interval for navigation
 let navMarker       = null;   // Leaflet marker for navigation car
-let navDestCoord    = null;   // { lat, lon } destination stored at nav start
+let navDestCoord      = null;   // { lat, lon } destination stored at nav start
+let pinnedSourceCoord = null;   // set when user picks "My Location" as source
 let navWatchId      = null;   // geolocation watchPosition ID
 let isRerouting     = false;  // prevent concurrent reroute calls
 let lastRerouteTime = 0;      // timestamp of last reroute (ms)
@@ -108,6 +109,8 @@ async function showNearbySuggestions(field) {
 }
 
 function onInputChange(field) {
+  // If user starts typing in source, clear any pinned GPS location
+  if (field === 'source') pinnedSourceCoord = null;
   const val = document.getElementById(field).value.trim();
   const clearBtn = document.getElementById(`clear-${field}`);
   clearBtn.style.display = val ? 'block' : 'none';
@@ -165,7 +168,13 @@ async function fetchSuggestions(field, query) {
 function renderSuggestionsWithGroup(field, results, groupLabel) {
   const list = document.getElementById(`suggestions-${field}`);
   list.innerHTML = '';
-  if (!results.length) { list.classList.add('hidden'); return; }
+  prependMyLocationItem(list, field);
+  if (!results.length) {
+    // Still show dropdown if My Location item was added
+    if (field === 'source') list.classList.remove('hidden');
+    else list.classList.add('hidden');
+    return;
+  }
   const label = document.createElement('div');
   label.className = 'suggestion-group-label';
   label.textContent = groupLabel;
@@ -177,6 +186,7 @@ function renderSuggestionsWithGroup(field, results, groupLabel) {
 function renderSuggestions(field, results) {
   const list = document.getElementById(`suggestions-${field}`);
   list.innerHTML = '';
+  prependMyLocationItem(list, field);
 
   // First: nearby matches (if any overlap)
   const typedQuery = document.getElementById(field).value.trim().toLowerCase();
@@ -274,9 +284,42 @@ function updateFocus(items, idx) {
 function clearInput(field) {
   document.getElementById(field).value = '';
   document.getElementById(`clear-${field}`).style.display = 'none';
+  if (field === 'source') pinnedSourceCoord = null;
   hideSuggestions(field);
   acState[field].results = [];
   document.getElementById(field).focus();
+}
+
+/** Called when user taps "My Location" in the source suggestions. */
+function selectMyLocation() {
+  if (!userLocation) {
+    showAlert('⚠ GPS not available yet – please wait a moment');
+    return;
+  }
+  document.getElementById('source').value = '📍 My Location';
+  document.getElementById('clear-source').style.display = 'block';
+  pinnedSourceCoord = { lat: userLocation.lat, lon: userLocation.lon };
+  hideSuggestions('source');
+}
+
+/**
+ * Inserts a "My Location" shortcut item at the top of the source dropdown.
+ * Only shown for the source (not destination) field.
+ */
+function prependMyLocationItem(list, field) {
+  if (field !== 'source') return;
+  const gpsReady = !!userLocation;
+  const el = document.createElement('div');
+  el.className = 'suggestion-item';
+  el.style.cssText = gpsReady ? '' : 'opacity:0.5;pointer-events:none';
+  el.innerHTML = `
+    <span class="suggestion-pin" style="font-size:18px">🎯</span>
+    <div class="suggestion-text">
+      <div class="suggestion-main" style="color:#6c47ff;font-weight:700;">My Location</div>
+      <div class="suggestion-sub">${gpsReady ? 'Use your current GPS position' : 'Acquiring GPS…'}</div>
+    </div>`;
+  el.addEventListener('mousedown', e => { e.preventDefault(); selectMyLocation(); });
+  list.insertBefore(el, list.firstChild);
 }
 
 document.addEventListener('click', e => {
@@ -352,10 +395,19 @@ async function getRoutes() {
   setLoading(true);
   hideAlert();
 
-  // Geocode
+  // If user picked "My Location", recover pinned coord (handle page reload edge case)
+  if (srcVal === '📍 My Location' && !pinnedSourceCoord) {
+    if (userLocation) pinnedSourceCoord = { lat: userLocation.lat, lon: userLocation.lon };
+    else { setLoading(false); showAlert('⚠ GPS location not yet available – please wait'); return; }
+  }
+
+  // Geocode (skip geocoding for source if GPS coord is already pinned)
   let fromCoord, toCoord;
   try {
-    [fromCoord, toCoord] = await Promise.all([geocode(srcVal), geocode(dstVal)]);
+    const fromPromise = pinnedSourceCoord
+      ? Promise.resolve(pinnedSourceCoord)
+      : geocode(srcVal);
+    [fromCoord, toCoord] = await Promise.all([fromPromise, geocode(dstVal)]);
   } catch (e) {
     setLoading(false); showAlert('❌ ' + e.message); return;
   }
