@@ -20,6 +20,10 @@ let routesData      = [];
 let userLocation    = null;   // { lat, lon } from geolocation
 let navInterval     = null;   // animation interval for navigation
 let navMarker       = null;   // Leaflet marker for navigation car
+let navDestCoord    = null;   // { lat, lon } destination stored at nav start
+let navWatchId      = null;   // geolocation watchPosition ID
+let isRerouting     = false;  // prevent concurrent reroute calls
+let lastRerouteTime = 0;      // timestamp of last reroute (ms)
 
 // SOS Timer state
 let sosTimerInterval   = null;
@@ -723,9 +727,94 @@ const NAV_STEPS = [
   { icon: '🏁', dist: 'Arriving', street: 'You have reached your destination' },
 ];
 
+// ── Off-route detection helpers ──────────────────────────────────
+
+/**
+ * Returns the minimum distance (metres) from `latlng` ([lat,lon]) to the
+ * nearest point on the polyline defined by `coords` ([[lat,lon], …]).
+ */
+function distanceToPolyline(latlng, coords) {
+  let minDist = Infinity;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const d = pointToSegmentDist(latlng, coords[i], coords[i + 1]);
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
+}
+
+/** Euclidean distance (metres via Leaflet) from point P to segment AB. */
+function pointToSegmentDist(P, A, B) {
+  const pA = map.distance(P, A);
+  const pB = map.distance(P, B);
+  const ab = map.distance(A, B);
+  if (ab === 0) return pA;
+  // Project P onto line AB (parametric t ∈ [0,1])
+  const t = Math.max(0, Math.min(1,
+    ((P[0] - A[0]) * (B[0] - A[0]) + (P[1] - A[1]) * (B[1] - A[1])) /
+    ((B[0] - A[0]) ** 2 + (B[1] - A[1]) ** 2)
+  ));
+  const closest = [A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])];
+  return map.distance(P, closest);
+}
+
+/**
+ * Fetch a fresh route from currentLoc to navDestCoord and update
+ * the active navigation route + HUD without leaving nav mode.
+ */
+async function rerouteFromCurrentPosition(currentLoc) {
+  if (isRerouting || !navDestCoord) return;
+  isRerouting = true;
+  lastRerouteTime = Date.now();
+
+  // Show rerouting banner
+  updateTurnBanner({ icon: '🔄', dist: 'Please wait…', street: 'Rerouting…' });
+
+  try {
+    const fromCoord = { lat: currentLoc[0], lon: currentLoc[1] };
+    const osrmRoutes = await getOSRMRoute(fromCoord, navDestCoord);
+    if (!osrmRoutes || !osrmRoutes.length) throw new Error('No route');
+
+    const newRoute = osrmRoutes[0];   // take fastest new route
+
+    // Update the active route in routesData so arrival check keeps working
+    routesData[selectedRoute].coords      = newRoute.coords;
+    routesData[selectedRoute].eta         = newRoute.eta;
+    routesData[selectedRoute].distance    = newRoute.distance;
+    routesData[selectedRoute].durationMins = newRoute.durationMins;
+
+    // Redraw only the new active route
+    clearRoutes();
+    drawRoute(routesData[selectedRoute], selectedRoute ?? 0);
+
+    // Update HUD
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + newRoute.durationMins);
+    const arrivalTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('nav-hud-eta-val').textContent  = arrivalTime;
+    document.getElementById('nav-hud-dist-val').textContent = newRoute.distance;
+
+    // Refresh landmarks for new route
+    fetchAndShowLandmarks([routesData[selectedRoute]]);
+
+    showAlert('🔄 Route updated from your current location');
+    updateTurnBanner(NAV_STEPS[0]);  // reset turn instruction
+  } catch (e) {
+    showAlert('⚠ Could not reroute – check internet connection');
+    updateTurnBanner(NAV_STEPS[0]);
+  } finally {
+    isRerouting = false;
+  }
+}
+
 function startNavigation() {
   if (selectedRoute === null) return;
   const route = routesData[selectedRoute];
+
+  // ── Store destination coordinate for rerouting ──
+  const destCoords = route.coords[route.coords.length - 1];
+  navDestCoord  = { lat: destCoords[0], lon: destCoords[1] };
+  isRerouting   = false;
+  lastRerouteTime = 0;
 
   // Enter nav mode
   document.getElementById('bottom-panel').classList.add('nav-mode');
@@ -756,7 +845,7 @@ function startNavigation() {
     html: '<div class="nav-car-icon">🚗</div>',
     iconSize: [36, 36], iconAnchor: [18, 18], className: ''
   });
-  
+
   // Set initial position based on real GPS or route start
   const startPos = userLocation ? [userLocation.lat, userLocation.lon] : route.coords[0];
   navMarker = L.marker(startPos, { icon: carIcon, zIndexOffset: 1000 }).addTo(map);
@@ -765,37 +854,60 @@ function startNavigation() {
   // Show first turn instruction
   updateTurnBanner(NAV_STEPS[0]);
 
+  // ── OFF-ROUTE DETECTION CONSTANTS ──
+  const OFF_ROUTE_THRESHOLD_M = 75;   // metres before triggering reroute
+  const REROUTE_COOLDOWN_MS   = 15000; // minimum 15 s between reroutes
+
   // Real-time device tracking via Geolocation API
   let stepIdx = 0;
+  if (navWatchId !== null) { navigator.geolocation.clearWatch(navWatchId); navWatchId = null; }
+
   navWatchId = navigator.geolocation.watchPosition((pos) => {
     const lat = pos.coords.latitude;
     const lon = pos.coords.longitude;
     const currentLoc = [lat, lon];
-    
-    // Smoothly pan map and move marker to real device location
+
+    // Move car marker and pan map
     navMarker.setLatLng(currentLoc);
     map.panTo(currentLoc, { animate: true, duration: 1.0 });
 
-    // For hackathon completeness: we cycle steps slowly since we don't have a real routing engine parsing progress
-    stepIdx = Math.min(stepIdx + 1, NAV_STEPS.length - 2); 
-    if (Math.random() > 0.8) { // Occasionally update step just for UX simulation
-        updateTurnBanner(NAV_STEPS[stepIdx]);
+    // ── OFF-ROUTE CHECK ──────────────────────────────────────────
+    const activeCoords = routesData[selectedRoute].coords;
+    const distFromRoute = distanceToPolyline(currentLoc, activeCoords);
+    const now2 = Date.now();
+
+    if (
+      distFromRoute > OFF_ROUTE_THRESHOLD_M &&
+      !isRerouting &&
+      (now2 - lastRerouteTime) > REROUTE_COOLDOWN_MS
+    ) {
+      rerouteFromCurrentPosition(currentLoc);
+      return; // skip step logic until reroute completes
+    }
+    // ─────────────────────────────────────────────────────────────
+
+    // Cycle turn-by-turn steps for UX simulation
+    stepIdx = Math.min(stepIdx + 1, NAV_STEPS.length - 2);
+    if (Math.random() > 0.8) {
+      updateTurnBanner(NAV_STEPS[stepIdx]);
     }
 
-    // Check if arrived (within ~50 meters of destination)
-    const dest = route.coords[route.coords.length - 1];
-    const distMeters = map.distance(currentLoc, dest);
-    
+    // Check if arrived (within ~50 metres of destination)
+    const dest       = routesData[selectedRoute].coords;
+    const destPoint  = dest[dest.length - 1];
+    const distMeters = map.distance(currentLoc, destPoint);
+
     if (distMeters < 50) {
       navigator.geolocation.clearWatch(navWatchId);
+      navWatchId = null;
       updateTurnBanner(NAV_STEPS[NAV_STEPS.length - 1]);
       showAlert('🏁 You have arrived at your destination!');
       setTimeout(stopNavigation, 4000);
     }
   }, (err) => {
-    console.warn("Tracking error: ", err);
+    console.warn('Tracking error:', err);
     showAlert('⚠ Waiting for GPS location...');
-  }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 5000 });
+  }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
 
   // Start SOS arrival timer when Women Safety Mode is active
   if (wsmMode) startSOSTimer(route.durationMins);
@@ -808,10 +920,12 @@ function updateTurnBanner(step) {
 }
 
 function stopNavigation() {
-  if (typeof navWatchId !== 'undefined' && navWatchId !== null) {
+  if (navWatchId !== null) {
     navigator.geolocation.clearWatch(navWatchId);
     navWatchId = null;
   }
+  isRerouting  = false;
+  navDestCoord = null;
   if (navInterval) {
     clearInterval(navInterval);
     navInterval = null;
