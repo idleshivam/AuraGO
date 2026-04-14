@@ -128,11 +128,10 @@ function onInputChange(field) {
 
 async function fetchSuggestions(field, query) {
   try {
-    // Switch to Photon API for superior autocomplete results (like Google Maps)
-    let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8`;
+    let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=12`;
+    // Use lat/lon for soft proximity bias only — NO bbox so distant places still show up
     if (userLocation) {
-      const d = 1.0; // ~100km bounds prevents global matches (like USA McDonald's) from taking priority
-      url += `&lat=${userLocation.lat}&lon=${userLocation.lon}&bbox=${userLocation.lon-d},${userLocation.lat-d},${userLocation.lon+d},${userLocation.lat+d}`; 
+      url += `&lat=${userLocation.lat}&lon=${userLocation.lon}`;
     }
     const res  = await fetch(url);
     const data = await res.json();
@@ -348,9 +347,9 @@ function iconForType(type, cls) {
 // ================================================================
 async function geocode(place) {
   let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(place)}&limit=1`;
+  // Soft proximity bias only — no bbox so geocoding works for any city/country
   if (userLocation) {
-    const d = 1.0; // local bounds
-    url += `&lat=${userLocation.lat}&lon=${userLocation.lon}&bbox=${userLocation.lon-d},${userLocation.lat-d},${userLocation.lon+d},${userLocation.lat+d}`;
+    url += `&lat=${userLocation.lat}&lon=${userLocation.lon}`;
   }
   const res  = await fetch(url);
   const data = await res.json();
