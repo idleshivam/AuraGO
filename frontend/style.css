@@ -118,6 +118,19 @@ html, body {
 }
 .status-label { font-size: 12px; font-weight: 600; color: var(--safe); }
 
+.user-profile {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; margin-left: 8px;
+  transition: transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px var(--primary-glow);
+}
+.user-profile:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(91,76,245,0.4); }
+
 /* ================================================================
    ALERT BANNER
    ================================================================ */

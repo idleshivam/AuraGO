@@ -30,6 +30,48 @@ let sosTimerInterval   = null;
 let sosTimerSeconds    = 0;
 let sosConfirmInterval = null;  // sub-timer for "are you safe?" confirmation step
 
+// ──────────── Auth & User Profile ────────────
+function getAuthToken() {
+  return localStorage.getItem('ag_token');
+}
+
+function checkAuthInit() {
+  const token = getAuthToken();
+  if (!token) {
+    window.location.href = '/login';
+    return;
+  }
+  
+  const name = localStorage.getItem('ag_name');
+  if (name) {
+    const el = document.getElementById('user-profile');
+    const init = document.getElementById('user-initial');
+    if (el && init) {
+      init.textContent = name.charAt(0).toUpperCase();
+      el.classList.remove('hidden');
+    }
+  }
+}
+
+function handleLogout() {
+  const token = getAuthToken();
+  if (token) {
+    fetch('/auth/logout', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).finally(() => {
+      localStorage.removeItem('ag_token');
+      localStorage.removeItem('ag_name');
+      localStorage.removeItem('ag_email');
+      window.location.href = '/login';
+    });
+  } else {
+    window.location.href = '/login';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', checkAuthInit);
+
 // ──────────── Get User Location (for nearby suggestions) ────────────
 (function detectUserLocation() {
   if (!navigator.geolocation) return;
