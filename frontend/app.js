@@ -1180,17 +1180,223 @@ function cancelSOSTimer() {
   if (cd) { cd.style.color = ''; }
 }
 
-function triggerSOSAlert() {
+async function triggerSOSAlert() {
   // Build a shareable location URL
   const locStr = userLocation
     ? `https://maps.google.com/?q=${userLocation.lat},${userLocation.lon}`
     : 'Location unavailable';
-  const msg = `🚨 SOS! I haven't reached my destination. Last known location: ${locStr}`;
+
+  // Fetch emergency contact info from backend
+  let ecInfo = null;
+  const token = getAuthToken();
+  if (token) {
+    try {
+      const res = await fetch('/auth/emergency-contact', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (res.ok) ecInfo = await res.json();
+    } catch (e) { /* proceed without */ }
+  }
+
+  // Build SOS message with emergency contact details
+  let msg = `🚨 SOS ALERT!\n`;
+  if (ecInfo) {
+    msg += `From: ${ecInfo.user_name}${ecInfo.user_phone ? ' (' + ecInfo.user_phone + ')' : ''}\n`;
+    msg += `Emergency Contact: ${ecInfo.emergency_contact_name} (${ecInfo.relationship || 'contact'})\n`;
+    msg += `Contact Phone: ${ecInfo.emergency_contact_phone}\n`;
+  }
+  msg += `I haven't reached my destination.\nLast known location: ${locStr}\n`;
+  msg += `Time: ${new Date().toLocaleString()}`;
+
   // Try Web Share API (works on mobile), fallback to copy
   if (navigator.share) {
     navigator.share({ title: 'Emergency SOS', text: msg }).catch(() => {});
   } else {
     navigator.clipboard?.writeText(msg).catch(() => {});
-    showAlert('🚨 SOS message copied to clipboard! Share with emergency contact.');
+    const contactName = ecInfo?.emergency_contact_name || 'emergency contact';
+    showAlert(`🚨 SOS message for ${contactName} copied to clipboard!`);
   }
 }
+
+
+// ================================================================
+//  COMMUNITY INCIDENT REPORTING
+// ================================================================
+let reportMode       = false;     // true when user is selecting map location
+let reportMarker     = null;      // temp marker during report flow
+let reportLat        = null;
+let reportLon        = null;
+let reportCategory   = null;
+let incidentMarkers  = [];        // persistent markers on map
+let reportsLoaded    = false;
+
+const REPORT_COLORS = {
+  harassment:          { icon: '🚫', color: '#dc2626', bg: '#fef2f2' },
+  poor_lighting:       { icon: '🌑', color: '#6b7280', bg: '#f3f4f6' },
+  suspicious_activity: { icon: '👁',  color: '#d97706', bg: '#fffbeb' },
+  accident:            { icon: '💥', color: '#ef4444', bg: '#fef2f2' },
+  unsafe_crowd:        { icon: '👥', color: '#7c3aed', bg: '#f5f3ff' },
+  roadblock:           { icon: '🚧', color: '#ea580c', bg: '#fff7ed' },
+  other:               { icon: '📌', color: '#6366f1', bg: '#eef2ff' },
+};
+
+function startReportFlow() {
+  reportMode     = true;
+  reportLat      = null;
+  reportLon      = null;
+  reportCategory = null;
+
+  // Show modal
+  document.getElementById('report-modal').classList.remove('hidden');
+  document.getElementById('report-location-hint').textContent = '📍 Tap on the map to select location';
+  document.getElementById('report-location-hint').style.color = '#d97706';
+  document.getElementById('report-submit-btn').disabled = true;
+  document.getElementById('report-desc').value = '';
+  document.querySelectorAll('.report-cat-btn').forEach(b => b.classList.remove('selected'));
+
+  // If we already have the user's location, use it as default
+  if (userLocation) {
+    setReportLocation(userLocation.lat, userLocation.lon);
+  }
+
+  // Enable map click listener
+  map.on('click', onReportMapClick);
+  showAlert('📍 Tap the map to select incident location');
+}
+
+function onReportMapClick(e) {
+  if (!reportMode) return;
+  setReportLocation(e.latlng.lat, e.latlng.lng);
+}
+
+function setReportLocation(lat, lon) {
+  reportLat = lat;
+  reportLon = lon;
+  document.getElementById('report-location-hint').textContent =
+    `📍 Location: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  document.getElementById('report-location-hint').style.color = '#16a34a';
+
+  // Show temporary marker
+  if (reportMarker) map.removeLayer(reportMarker);
+  const tempIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:18px;height:18px;background:#dc2626;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>',
+    iconSize: [18, 18], iconAnchor: [9, 9]
+  });
+  reportMarker = L.marker([lat, lon], { icon: tempIcon }).addTo(map);
+  checkReportReady();
+}
+
+function selectReportCat(btn) {
+  document.querySelectorAll('.report-cat-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  reportCategory = btn.dataset.cat;
+  checkReportReady();
+}
+
+function checkReportReady() {
+  const ready = reportLat !== null && reportCategory !== null;
+  document.getElementById('report-submit-btn').disabled = !ready;
+}
+
+function cancelReport() {
+  reportMode = false;
+  map.off('click', onReportMapClick);
+  if (reportMarker) { map.removeLayer(reportMarker); reportMarker = null; }
+  document.getElementById('report-modal').classList.add('hidden');
+}
+
+async function submitReport() {
+  if (!reportLat || !reportCategory) return;
+
+  const token = getAuthToken();
+  if (!token) {
+    showAlert('⚠ Please sign in to report incidents');
+    return;
+  }
+
+  const btn = document.getElementById('report-submit-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Submitting...';
+
+  try {
+    const res = await fetch('/report', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify({
+        category: reportCategory,
+        description: document.getElementById('report-desc').value.trim(),
+        latitude: reportLat,
+        longitude: reportLon,
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAlert('✅ ' + (data.message || 'Report submitted!'));
+      // Add marker immediately
+      placeIncidentMarker(reportLat, reportLon, reportCategory,
+        document.getElementById('report-desc').value.trim(), new Date().toISOString());
+      cancelReport();
+    } else {
+      showAlert('❌ ' + (data.error || 'Failed to submit report'));
+      btn.disabled = false;
+      btn.textContent = '📤 Submit Report';
+    }
+  } catch (e) {
+    showAlert('❌ Network error. Please try again.');
+    btn.disabled = false;
+    btn.textContent = '📤 Submit Report';
+  }
+}
+
+function placeIncidentMarker(lat, lon, category, description, createdAt) {
+  const cfg = REPORT_COLORS[category] || REPORT_COLORS.other;
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="incident-marker" style="border-color:${cfg.color};background:${cfg.bg};">
+             <span class="incident-icon">${cfg.icon}</span>
+           </div>`,
+    iconSize: [30, 30], iconAnchor: [15, 15]
+  });
+
+  const catLabel = category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const timeStr = createdAt ? new Date(createdAt).toLocaleString() : 'Just now';
+  const descHtml = description ? `<br><span style="font-size:11px;color:#555;">${description}</span>` : '';
+
+  const marker = L.marker([lat, lon], { icon, zIndexOffset: 150 })
+    .addTo(map)
+    .bindPopup(
+      `<div style="font-family:'Inter',sans-serif;font-size:13px;">
+         <strong>${cfg.icon} ${catLabel}</strong>${descHtml}
+         <br><span style="font-size:10px;color:#999;">🕐 ${timeStr}</span>
+       </div>`,
+      { maxWidth: 220 }
+    );
+  incidentMarkers.push(marker);
+}
+
+async function loadReports() {
+  try {
+    const bounds = map.getBounds();
+    const url = `/reports?south=${bounds.getSouth()}&north=${bounds.getNorth()}&west=${bounds.getWest()}&east=${bounds.getEast()}`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const reports = await res.json();
+
+    // Clear existing incident markers
+    incidentMarkers.forEach(m => map.removeLayer(m));
+    incidentMarkers = [];
+
+    reports.forEach(r => {
+      placeIncidentMarker(r.latitude, r.longitude, r.category, r.description, r.created_at);
+    });
+  } catch (e) { /* silently fail */ }
+}
+
+// Load reports when map view changes
+map.on('moveend', () => { loadReports(); });
+// Initial load after a brief delay
+setTimeout(loadReports, 2000);

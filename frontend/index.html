@@ -231,6 +231,43 @@
     <button class="sos-confirm-sos-btn" onclick="cancelSOSTimer(); triggerSOSAlert()">🚨 Send SOS Now</button>
   </div>
 
+  <!-- ===== REPORT INCIDENT BUTTON (floating, left side) ===== -->
+  <button class="report-float-btn" id="report-float-btn" onclick="startReportFlow()" title="Report an incident">
+    <span class="report-float-icon">📢</span>
+    <span class="report-float-label">Report</span>
+  </button>
+
+  <!-- ===== REPORT INCIDENT MODAL ===== -->
+  <div id="report-modal" class="report-modal hidden">
+    <div class="report-modal-header">
+      <span class="report-modal-title">📢 Report Incident</span>
+      <button class="report-modal-close" onclick="cancelReport()">✕</button>
+    </div>
+    <div class="report-modal-body">
+      <div class="report-location-hint" id="report-location-hint">
+        📍 Tap on the map to select location
+      </div>
+
+      <label class="report-label">Category</label>
+      <div class="report-categories" id="report-categories">
+        <button type="button" class="report-cat-btn" data-cat="harassment" onclick="selectReportCat(this)">🚫 Harassment</button>
+        <button type="button" class="report-cat-btn" data-cat="poor_lighting" onclick="selectReportCat(this)">🌑 Poor Lighting</button>
+        <button type="button" class="report-cat-btn" data-cat="suspicious_activity" onclick="selectReportCat(this)">👁 Suspicious Activity</button>
+        <button type="button" class="report-cat-btn" data-cat="accident" onclick="selectReportCat(this)">💥 Accident</button>
+        <button type="button" class="report-cat-btn" data-cat="unsafe_crowd" onclick="selectReportCat(this)">👥 Unsafe Crowd</button>
+        <button type="button" class="report-cat-btn" data-cat="roadblock" onclick="selectReportCat(this)">🚧 Roadblock</button>
+        <button type="button" class="report-cat-btn" data-cat="other" onclick="selectReportCat(this)">📌 Other</button>
+      </div>
+
+      <label class="report-label">Description <span style="color:rgba(0,0,0,0.3);font-weight:400;">(optional)</span></label>
+      <textarea id="report-desc" class="report-desc" placeholder="What did you observe?" maxlength="300" rows="3"></textarea>
+
+      <button class="report-submit-btn" id="report-submit-btn" onclick="submitReport()" disabled>
+        📤 Submit Report
+      </button>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
 </body>

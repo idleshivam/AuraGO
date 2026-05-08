@@ -265,6 +265,19 @@
     }
     .strength-label { font-size: 11px; color: rgba(255,255,255,0.30); margin-top: 4px; font-weight: 500; }
 
+    /* ── Emergency contact section ──────────────────────────── */
+    .ec-section {
+      background: rgba(225,29,72,0.06);
+      border: 1px solid rgba(225,29,72,0.15);
+      border-radius: 12px; padding: 14px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .ec-header {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 700; color: #fca5a5;
+    }
+    .ec-icon { font-size: 15px; }
+
     /* ── Bottom switch link ──────────────────────────────────── */
     .switch-note {
       text-align: center; font-size: 13px;
@@ -417,6 +430,53 @@
             </div>
           </div>
 
+          <div>
+            <label class="field-label" for="reg-phone">Phone Number</label>
+            <div class="field">
+              <span class="field-icon">📱</span>
+              <input id="reg-phone" type="tel" placeholder="+91 XXXXX XXXXX" autocomplete="tel" />
+            </div>
+          </div>
+
+          <!-- Emergency Contact Section -->
+          <div class="ec-section">
+            <div class="ec-header">
+              <span class="ec-icon">🚨</span>
+              <span>Emergency Contact <span style="font-size:10px;color:rgba(255,255,255,0.35);">(required)</span></span>
+            </div>
+
+            <div>
+              <label class="field-label" for="reg-ec-name">Contact Name</label>
+              <div class="field">
+                <span class="field-icon">👤</span>
+                <input id="reg-ec-name" type="text" placeholder="Parent, friend, guardian..." required />
+              </div>
+            </div>
+
+            <div>
+              <label class="field-label" for="reg-ec-phone">Contact Phone</label>
+              <div class="field">
+                <span class="field-icon">📞</span>
+                <input id="reg-ec-phone" type="tel" placeholder="+91 XXXXX XXXXX" required />
+              </div>
+            </div>
+
+            <div>
+              <label class="field-label" for="reg-ec-rel">Relationship</label>
+              <div class="field">
+                <span class="field-icon">🤝</span>
+                <select id="reg-ec-rel" style="flex:1;border:none;background:transparent;padding:13px 0;font-size:14px;font-weight:500;color:#fff;outline:none;font-family:inherit;-webkit-appearance:none;">
+                  <option value="parent" style="background:#1a1a2e;">Parent</option>
+                  <option value="spouse" style="background:#1a1a2e;">Spouse</option>
+                  <option value="sibling" style="background:#1a1a2e;">Sibling</option>
+                  <option value="friend" style="background:#1a1a2e;">Friend</option>
+                  <option value="guardian" style="background:#1a1a2e;">Guardian</option>
+                  <option value="other" style="background:#1a1a2e;">Other</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <button class="submit-btn" id="reg-btn" type="submit">
             <span id="reg-btn-label">Create Account</span>
           </button>
@@ -558,8 +618,12 @@
       clearErrors();
       const name     = document.getElementById('reg-name').value.trim();
       const email    = document.getElementById('reg-email').value.trim();
+      const phone    = document.getElementById('reg-phone').value.trim();
       const password = document.getElementById('reg-password').value.trim();
       const confirm  = document.getElementById('reg-confirm').value.trim();
+      const ecName   = document.getElementById('reg-ec-name').value.trim();
+      const ecPhone  = document.getElementById('reg-ec-phone').value.trim();
+      const ecRel    = document.getElementById('reg-ec-rel').value;
 
       if (!name || !email || !password || !confirm) {
         showError('reg', 'Please fill in all fields.'); return;
@@ -570,13 +634,21 @@
       if (password !== confirm) {
         showError('reg', 'Passwords do not match.'); return;
       }
+      if (!ecName || !ecPhone) {
+        showError('reg', 'Emergency contact name and phone are required.'); return;
+      }
 
       setLoading('reg-btn', 'reg-btn-label', true);
       try {
         const res  = await fetch(API + '/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password })
+          body: JSON.stringify({
+            name, email, phone, password,
+            emergency_contact_name: ecName,
+            emergency_contact_phone: ecPhone,
+            relationship: ecRel
+          })
         });
         const data = await res.json();
         if (!res.ok) { showError('reg', data.error || 'Registration failed.'); return; }

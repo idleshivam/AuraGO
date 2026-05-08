@@ -855,7 +855,101 @@ html, body {
   background: rgba(220,38,38,0.12);
   border: 1px solid rgba(220,38,38,0.30);
   color: #fca5a5; font-size: 13px; font-weight: 700;
-  cursor: pointer; font-family: inherit;
   transition: background 0.18s;
 }
 .sos-confirm-sos-btn:hover { background: rgba(220,38,38,0.24); }
+
+/* ================================================================
+   INCIDENT REPORTING
+   ================================================================ */
+.report-float-btn {
+  position: fixed; top: 130px; left: 16px; z-index: 800;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 52px; height: 52px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-md); cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  font-family: inherit; border: 1px solid var(--border);
+}
+.report-float-btn:hover { transform: scale(1.06); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+.report-float-btn:active { transform: scale(0.94); }
+.report-float-icon { font-size: 20px; line-height: 1; }
+.report-float-label { font-size: 9px; font-weight: 800; margin-top: 2px; color: var(--text-2); }
+
+/* Report Modal */
+.report-modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 1700; width: min(340px, 92vw);
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  display: flex; flex-direction: column;
+  animation: pop-in 0.25s cubic-bezier(.25,.87,.54,1);
+  overflow: hidden;
+}
+.report-modal.hidden { display: none !important; }
+
+.report-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.report-modal-title { font-size: 16px; font-weight: 800; color: var(--text); }
+.report-modal-close {
+  background: none; border: none; font-size: 16px; color: var(--text-3);
+  cursor: pointer; padding: 4px; transition: color 0.15s;
+}
+.report-modal-close:hover { color: var(--text); }
+
+.report-modal-body { padding: 20px; }
+
+.report-location-hint {
+  font-size: 12px; font-weight: 600; text-align: center;
+  padding: 10px; background: rgba(217,119,6,0.1); color: #d97706;
+  border-radius: var(--radius-xs); margin-bottom: 16px;
+  border: 1px solid rgba(217,119,6,0.2);
+}
+
+.report-label {
+  display: block; font-size: 12px; font-weight: 700; color: var(--text-2);
+  margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+.report-categories {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px;
+}
+.report-cat-btn {
+  padding: 8px 12px; background: var(--surface-2); border: 1.5px solid var(--border);
+  border-radius: 20px; font-size: 13px; font-weight: 600; color: var(--text-2);
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.report-cat-btn:hover { background: var(--surface-3); border-color: var(--border-strong); }
+.report-cat-btn.selected {
+  background: var(--primary-dim); border-color: var(--primary); color: var(--primary);
+}
+
+.report-desc {
+  width: 100%; padding: 12px; border-radius: var(--radius-xs);
+  border: 1.5px solid var(--border); background: var(--surface-2);
+  font-size: 13px; font-family: inherit; resize: none; margin-bottom: 18px;
+  color: var(--text); outline: none; transition: border-color 0.2s;
+}
+.report-desc:focus { border-color: var(--primary); }
+
+.report-submit-btn {
+  width: 100%; padding: 14px; border: none; border-radius: var(--radius-sm);
+  background: var(--primary); color: #fff; font-size: 15px; font-weight: 700;
+  cursor: pointer; font-family: inherit; box-shadow: 0 4px 16px var(--primary-glow);
+  transition: opacity 0.2s, transform 0.15s;
+}
+.report-submit-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(91,76,245,0.4); }
+.report-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+/* Incident Marker */
+.incident-marker {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 3px solid; display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-sm); cursor: pointer;
+}
+.incident-icon { font-size: 14px; line-height: 1; }
+
