@@ -133,11 +133,12 @@ def logout():
 @app.route("/routes", methods=["POST"])
 def routes():
     data = request.json
-    source      = data.get("source")
-    destination = data.get("destination")
-    women_mode  = bool(data.get("women_mode", False))   # ← new flag
+    source        = data.get("source")
+    destination   = data.get("destination")
+    women_mode    = bool(data.get("women_mode", False))
+    routes_coords = data.get("routes_coords", [])   # actual OSRM polylines
 
-    routes = get_routes(source, destination)
+    routes = get_routes(source, destination, routes_coords=routes_coords)
 
     for route in routes:
         route["safety_score"] = calculate_route_safety(

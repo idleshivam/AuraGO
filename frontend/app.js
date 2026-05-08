@@ -412,17 +412,22 @@ async function getRoutes() {
 
   const routes = osrmRoutes.slice(0, 3);  // Show up to 3 routes for comparison
 
-  // Backend safety
+  // Send actual route coordinates to backend for real geospatial safety analysis
   let safetyData = null;
   try {
     const res = await fetch('/routes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(4000),
-      body: JSON.stringify({ source: srcVal, destination: dstVal, women_mode: wsmMode })
+      signal: AbortSignal.timeout(12000),
+      body: JSON.stringify({
+        source: srcVal,
+        destination: dstVal,
+        women_mode: wsmMode,
+        routes_coords: routes.map(r => r.coords)   // actual OSRM polylines
+      })
     });
     if (res.ok) safetyData = await res.json();
-  } catch (e) { /* use mock */ }
+  } catch (e) { /* use fallback */ }
 
   const FALLBACK_PROFILES = [
     { score: 82, risks: ['Minimal risk detected','Well-lit street throughout','High foot traffic area'] },
@@ -443,6 +448,7 @@ async function getRoutes() {
       risks:           b?.risks?.length ? b.risks : fb.risks,
       segment_labels:  b?.segment_labels || [],
       explanation:     b?.explanation   || null,
+      metadata:        b?.metadata      || null,   // analysis mode + data sources
       coords:          r.coords
     };
   });
@@ -654,10 +660,15 @@ function renderRouteCards() {
   const container = document.getElementById('route-cards-container');
   container.innerHTML = '';
 
-  // Comparison header
+  // Comparison header with live/estimated badge
   const header = document.createElement('div');
   header.className = 'route-compare-header';
-  header.innerHTML = `<span>Comparing ${routesData.length} routes by safety</span>`;
+  const analysisMeta = routesData[0]?.metadata;
+  const isLive = analysisMeta?.analysis_mode === 'live';
+  const dataBadge = isLive
+    ? '<span class="data-badge live">🟢 Live Data</span>'
+    : '<span class="data-badge estimated">🟡 Estimated</span>';
+  header.innerHTML = `<span>Comparing ${routesData.length} routes by safety</span>${dataBadge}`;
   container.appendChild(header);
 
   routesData.forEach((route, i) => {
@@ -754,6 +765,23 @@ function populateSafetyCard(route) {
         item.innerHTML = `<span class="risk-icon">${h.icon}</span><span>${h.text}</span>`;
         hiSec.appendChild(item);
       });
+  }
+
+  // Data sources section
+  const meta = route.metadata;
+  if (meta) {
+    const dsDiv = document.createElement('div');
+    dsDiv.className = 'data-sources-section';
+    const modeIcon = meta.analysis_mode === 'live' ? '🟢' : '🟡';
+    const modeLabel = meta.analysis_mode === 'live' ? 'Live Geospatial Analysis' : 'Heuristic Estimate';
+    const confidenceClass = meta.confidence === 'high' ? 'conf-high' : 'conf-est';
+    dsDiv.innerHTML = `
+      <div class="data-sources-title">📡 Data Intelligence</div>
+      <div class="data-source-mode">${modeIcon} ${modeLabel} <span class="confidence-badge ${confidenceClass}">${meta.confidence} confidence</span></div>
+      <div class="data-source-list">${meta.data_sources.map(s => `<span class="ds-tag">${s}</span>`).join('')}</div>
+      ${meta.query_time_ms ? `<div class="data-source-time">⚡ Analyzed in ${meta.query_time_ms}ms${meta.cache_hit ? ' (cached)' : ''}</div>` : ''}
+    `;
+    hiSec.appendChild(dsDiv);
   }
 }
 
